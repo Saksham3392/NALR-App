@@ -9,7 +9,7 @@
 A high-performance, interactive MCQ practice and examination simulation platform built for Chitkara University's **Numerical Aptitude & Logical Reasoning-I (25UNI0110)** curriculum.
 
 ---
-###Download the APP
+### Download the APP
 
 https://github.com/Saksham3392/NALR-App/releases/download/v1.0.0/NALR.apk
 
