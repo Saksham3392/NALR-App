@@ -16,11 +16,7 @@ Experience the platform in action directly in your browser without local setup:
 👉 **https://nalr.onrender.com**  
 👉 **https://nalr.vercel.app**
 
-To view locally in your browser offline:
 
-```cmd
-cd /d "c:\Users\Asus\Downloads\CSE AI 5th Sem\NALR\NALR MCQs" && python serve.py
-```
 
 ---
 
