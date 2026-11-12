@@ -932,14 +932,22 @@ function updateExamTopicModalSummary() {
   }
 }
 
-function startExamWithSelectedTopics() {
+async function startExamWithSelectedTopics() {
   if (selectedExamModuleIds.length === 0) {
-    alert("Please select at least one topic with available questions.");
+    await showGlassAlert({
+      title: "No Topics Selected",
+      message: "Please select at least one topic with available questions.",
+      icon: "warning"
+    });
     return;
   }
   activeExamQuestions = QUIZ_QUESTIONS.filter(q => selectedExamModuleIds.includes(q.module_id));
   if (activeExamQuestions.length === 0) {
-    alert("Selected topics do not have questions loaded yet.");
+    await showGlassAlert({
+      title: "No Questions Available",
+      message: "Selected topics do not have questions loaded yet.",
+      icon: "warning"
+    });
     return;
   }
 
@@ -1122,7 +1130,7 @@ function updatePlannerSelectedCount() {
 }
 
 // Generate Personalized Daily Study Plan Algorithm
-function generateDailyStudyPlan() {
+async function generateDailyStudyPlan() {
   const dateInput = document.getElementById("plannerExamDateInput");
   const validationMsg = document.getElementById("plannerDateValidationMsg");
   const examDateStr = dateInput ? dateInput.value : "";
@@ -1156,7 +1164,11 @@ function generateDailyStudyPlan() {
   const selectedModuleIds = checkedBoxes.map(cb => cb.dataset.modId);
 
   if (selectedModuleIds.length === 0) {
-    alert("Please select at least one syllabus topic to include in your plan.");
+    await showGlassAlert({
+      title: "No Topics Selected",
+      message: "Please select at least one syllabus topic to include in your plan.",
+      icon: "warning"
+    });
     return;
   }
 
@@ -1209,7 +1221,11 @@ function generateDailyStudyPlan() {
   });
 
   if (taskItems.length === 0) {
-    alert("The selected topics currently have 0 practice questions available. Please select active syllabus topics (e.g. from ST-1).");
+    await showGlassAlert({
+      title: "No Practice Questions",
+      message: "The selected topics currently have 0 practice questions available. Please select active syllabus topics (e.g. from ST-1).",
+      icon: "warning"
+    });
     return;
   }
 
@@ -1508,8 +1524,16 @@ function jumpToPlannerTopic(termId, moduleId, typeId) {
 }
 
 // Reset Planner State and return to initial configuration form
-function resetStudyPlanner() {
-  if (confirm("Reset your study planner? This will erase your current daily schedule and allow you to configure a new target date.")) {
+async function resetStudyPlanner() {
+  const confirmed = await showGlassConfirm({
+    title: "Reset Study Planner",
+    message: "Reset your study planner? This will erase your current daily schedule and allow you to configure a new target date.",
+    confirmText: "Reset Planner",
+    cancelText: "Cancel",
+    isDestructive: true,
+    icon: "reset"
+  });
+  if (confirmed) {
     userStudyPlan = null;
     try {
       localStorage.removeItem(PLANNER_STORAGE_KEY);
@@ -1535,8 +1559,16 @@ function toggleExamMode() {
 }
 
 // Reset Progress
-function resetProgressPrompt() {
-  if (confirm("Are you sure you want to reset all progress, bookmarks, and test scores?")) {
+async function resetProgressPrompt() {
+  const confirmed = await showGlassConfirm({
+    title: "Reset All Progress",
+    message: "Are you sure you want to reset all progress, bookmarks, and test scores?",
+    confirmText: "Reset All",
+    cancelText: "Cancel",
+    isDestructive: true,
+    icon: "reset"
+  });
+  if (confirmed) {
     localStorage.removeItem(STORAGE_KEY);
     userPracticeAnswers = {};
     userExamAnswers = {};
@@ -1556,9 +1588,17 @@ function resetProgressPrompt() {
 }
 
 // Clear Answers
-function clearAllAnswersPrompt() {
+async function clearAllAnswersPrompt() {
   if (isExamMode) {
-    if (confirm("Clear all answers in Exam Mode?")) {
+    const confirmed = await showGlassConfirm({
+      title: "Clear Exam Answers",
+      message: "Clear all answers in Exam Mode?",
+      confirmText: "Clear All",
+      cancelText: "Cancel",
+      isDestructive: true,
+      icon: "broom"
+    });
+    if (confirmed) {
       userExamAnswers = {};
       saveCurrentState();
       renderFullExamQuestions();
@@ -1566,7 +1606,15 @@ function clearAllAnswersPrompt() {
     }
   } else {
     const totalQ = QUIZ_QUESTIONS.length;
-    if (confirm(`Clear all answers across all ${totalQ} questions?`)) {
+    const confirmed = await showGlassConfirm({
+      title: "Clear All Answers",
+      message: "Are you sure you want to clear all your practice answers? Your bookmarks and study plan will be kept.",
+      confirmText: "Clear All",
+      cancelText: "Cancel",
+      isDestructive: true,
+      icon: "broom"
+    });
+    if (confirmed) {
       userPracticeAnswers = {};
       saveCurrentState();
       const res = document.getElementById("quizResultsScreen");
@@ -1774,7 +1822,17 @@ function renderTopProgressTrack() {
     currentAnsCount = answeredExamCount;
     currentTotalQ = totalExamQuestions;
 
-    if (qNumLabel) qNumLabel.textContent = `Exam Mode (${totalExamQuestions} Questions)`;
+    if (qNumLabel) {
+      const examTitle = `Exam Mode (${totalExamQuestions} Questions)`;
+      if (qNumLabel.dataset.activeTitle !== examTitle) {
+        qNumLabel.dataset.activeTitle = examTitle;
+        qNumLabel.classList.add("is-updating");
+        setTimeout(() => {
+          qNumLabel.innerHTML = `<span class="telemetry-mod-name">Exam Mode</span> <span class="telemetry-mod-sub">(${totalExamQuestions} Questions)</span>`;
+          qNumLabel.classList.remove("is-updating");
+        }, 110);
+      }
+    }
     if (pctLabel) animateNumberValue(pctLabel, examPct, 380, val => `${val}%`);
     if (ansCountLabel) animateNumberValue(ansCountLabel, answeredExamCount, 380);
     if (totalCountLabel) totalCountLabel.textContent = totalExamQuestions;
@@ -1800,10 +1858,37 @@ function renderTopProgressTrack() {
     currentTotalQ = totalTypeQ;
 
     if (qNumLabel) {
+      const typeIndex = (curMod && curMod.types) ? curMod.types.findIndex(t => t.id === activeTypeId) : 0;
+      const typeNum = typeIndex >= 0 ? typeIndex + 1 : 1;
+      let targetText = "";
+      let targetHtml = "";
+
       if (curType) {
-        qNumLabel.textContent = `${curMod.num}. ${curMod.title} • ${curType.name}`;
+        // e.g. curType.name = "Type 1: Family Tree & Generation Deduction"
+        const colonIdx = curType.name.indexOf(":");
+        const subName = colonIdx !== -1 ? curType.name.slice(colonIdx + 1).trim() : "";
+        const baseName = `${curMod.title} Type ${typeNum}`;
+
+        if (subName) {
+          targetText = `${baseName} • ${subName}`;
+          targetHtml = `<span class="telemetry-mod-name">${escapeHtml(baseName)}</span><span class="telemetry-mod-sub"> • ${escapeHtml(subName)}</span>`;
+        } else {
+          targetText = baseName;
+          targetHtml = `<span class="telemetry-mod-name">${escapeHtml(baseName)}</span>`;
+        }
       } else {
-        qNumLabel.textContent = `${curMod.num}. ${curMod.title} (${totalTypeQ} Questions)`;
+        const baseName = `${curMod.title}`;
+        targetText = `${baseName} (${totalTypeQ} Questions)`;
+        targetHtml = `<span class="telemetry-mod-name">${escapeHtml(baseName)}</span> <span class="telemetry-mod-sub">(${totalTypeQ} Questions)</span>`;
+      }
+
+      if (qNumLabel.dataset.activeTitle !== targetText) {
+        qNumLabel.dataset.activeTitle = targetText;
+        qNumLabel.classList.add("is-updating");
+        setTimeout(() => {
+          qNumLabel.innerHTML = targetHtml;
+          qNumLabel.classList.remove("is-updating");
+        }, 110);
       }
     }
     if (pctLabel) animateNumberValue(pctLabel, typePct, 380, val => `${val}%`);
@@ -1820,9 +1905,8 @@ function renderTopProgressTrack() {
     }
     barTrack.style.width = `${currentPct}%`;
   }
-  lastRenderedProgressPct = currentPct;
 
-  // Animate Telemetry HUD Chip Percentage smoothly
+  // Animate Telemetry HUD Chip Percentage smoothly with subtle pulse
   if (chipEl) {
     let chipValEl = chipEl.querySelector(".chip-pct");
     let chipSubEl = chipEl.querySelector(".chip-sub");
@@ -1837,7 +1921,14 @@ function renderTopProgressTrack() {
     if (chipSubEl) {
       chipSubEl.textContent = `(${currentAnsCount}/${currentTotalQ} Qs)`;
     }
+    if (currentPct > lastRenderedProgressPct) {
+      chipEl.classList.remove("pulse-update");
+      void chipEl.offsetWidth; // Force reflow
+      chipEl.classList.add("pulse-update");
+      setTimeout(() => chipEl.classList.remove("pulse-update"), 300);
+    }
   }
+  lastRenderedProgressPct = currentPct;
 }
 
 
@@ -1892,6 +1983,9 @@ function toggleQuestionSolution(q, qCard) {
   }
 
   // Toggle collapsed state
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try { navigator.vibrate(12); } catch (e) {}
+  }
   const isCurrentlyCollapsed = feedbackBox.classList.contains('is-collapsed');
   if (isCurrentlyCollapsed) {
     // Expand solution
@@ -1931,6 +2025,9 @@ function copyQuestionToClipboard(q, qNum, btnElem) {
   const fullText = `Q ${qNum}. ${q.question}\n\n${formattedOpts}`;
 
   const markSuccess = () => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try { navigator.vibrate(18); } catch (e) {}
+    }
     if (btnElem) {
       btnElem.classList.remove("is-selection-highlighted");
       const origHtml = btnElem.innerHTML;
@@ -1941,6 +2038,8 @@ function copyQuestionToClipboard(q, qNum, btnElem) {
         btnElem.classList.remove("is-copied");
       }, 1600);
     }
+    // Trigger floating glass toast at bottom center
+    showGlassCopyToast();
   };
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2051,6 +2150,228 @@ function initQuestionSelectionCopyAffordance() {
       }
     }
   }, { passive: true });
+}
+
+// =============================================================================
+// GLASSMORPHISM TOAST & CONFIRMATION MODAL SYSTEM
+// =============================================================================
+
+let glassCopyToastTimer = null;
+let glassCopyToastHideTimer = null;
+
+function showGlassCopyToast() {
+  let toast = document.getElementById("glassCopyToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "glassCopyToast";
+    toast.className = "glass-copy-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    toast.innerHTML = `<span class="glass-toast-icon">✓</span><span class="glass-toast-text">Question and options are copied</span>`;
+    document.body.appendChild(toast);
+  }
+
+  // If already scheduled, clear both active timers to reset cleanly
+  if (glassCopyToastTimer) {
+    clearTimeout(glassCopyToastTimer);
+    glassCopyToastTimer = null;
+  }
+  if (glassCopyToastHideTimer) {
+    clearTimeout(glassCopyToastHideTimer);
+    glassCopyToastHideTimer = null;
+  }
+
+  toast.classList.remove("is-hiding");
+  // Trigger DOM reflow so CSS animation can replay smoothly if clicked repeatedly
+  void toast.offsetWidth;
+  toast.classList.add("is-visible");
+
+  // Stay visible for 500ms (0.5s), then smoothly fade out (150ms)
+  glassCopyToastTimer = setTimeout(() => {
+    toast.classList.add("is-hiding");
+    toast.classList.remove("is-visible");
+    glassCopyToastHideTimer = setTimeout(() => {
+      toast.classList.remove("is-hiding");
+      glassCopyToastHideTimer = null;
+    }, 150);
+    glassCopyToastTimer = null;
+  }, 500);
+}
+
+function showGlassConfirm({
+  title = "Confirm Action",
+  message = "Are you sure you want to proceed?",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
+  isDestructive = true,
+  icon = "warning"
+} = {}) {
+  return new Promise((resolve) => {
+    const existing = document.getElementById("glassConfirmOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "glassConfirmOverlay";
+    overlay.className = "glass-confirm-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+
+    let iconHtml = "⚠️";
+    let iconClass = "is-warning";
+    if (icon === "broom" || icon === "trash" || isDestructive) {
+      iconHtml = (icon === "broom") ? "🧹" : (icon === "reset" ? "🔄" : "⚠️");
+      iconClass = "is-destructive";
+    } else if (icon === "info") {
+      iconHtml = "ℹ️";
+      iconClass = "is-info";
+    }
+
+    overlay.innerHTML = `
+      <div class="glass-confirm-card" role="document">
+        <div class="glass-confirm-icon-badge ${iconClass}">
+          <span>${iconHtml}</span>
+        </div>
+        <h3 class="glass-confirm-title">${escapeHtml(title)}</h3>
+        <p class="glass-confirm-message">${escapeHtml(message)}</p>
+        <div class="glass-confirm-actions">
+          <button type="button" class="glass-confirm-btn glass-confirm-btn-cancel" id="btnGlassConfirmCancel">
+            ${escapeHtml(cancelText)}
+          </button>
+          <button type="button" class="glass-confirm-btn ${isDestructive ? 'glass-confirm-btn-confirm' : 'glass-confirm-btn-primary'}" id="btnGlassConfirmOk">
+            ${escapeHtml(confirmText)}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      overlay.classList.add("is-open");
+    });
+
+    let isDone = false;
+    const finish = (result) => {
+      if (isDone) return;
+      isDone = true;
+      document.removeEventListener("keydown", handleKeyDown);
+      overlay.classList.remove("is-open");
+      overlay.classList.add("is-closing");
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        resolve(result);
+      }, 150);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finish(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        finish(false);
+      }
+    });
+
+    const cancelBtn = overlay.querySelector("#btnGlassConfirmCancel");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", () => finish(false));
+      cancelBtn.focus();
+    }
+
+    const okBtn = overlay.querySelector("#btnGlassConfirmOk");
+    if (okBtn) {
+      okBtn.addEventListener("click", () => finish(true));
+    }
+  });
+}
+
+function showGlassAlert({
+  title = "Notice",
+  message = "",
+  confirmText = "OK",
+  icon = "info"
+} = {}) {
+  return new Promise((resolve) => {
+    const existing = document.getElementById("glassConfirmOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "glassConfirmOverlay";
+    overlay.className = "glass-confirm-overlay";
+    overlay.setAttribute("role", "alertdialog");
+    overlay.setAttribute("aria-modal", "true");
+
+    let iconHtml = (icon === "warning") ? "⚠️" : (icon === "success" ? "✓" : "ℹ️");
+    let iconClass = (icon === "warning") ? "is-warning" : "is-info";
+
+    overlay.innerHTML = `
+      <div class="glass-confirm-card" role="document">
+        <div class="glass-confirm-icon-badge ${iconClass}">
+          <span>${iconHtml}</span>
+        </div>
+        <h3 class="glass-confirm-title">${escapeHtml(title)}</h3>
+        <p class="glass-confirm-message">${escapeHtml(message)}</p>
+        <div class="glass-confirm-actions is-single-action">
+          <button type="button" class="glass-confirm-btn glass-confirm-btn-primary" id="btnGlassAlertOk">
+            ${escapeHtml(confirmText)}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      overlay.classList.add("is-open");
+    });
+
+    let isDone = false;
+    const finish = () => {
+      if (isDone) return;
+      isDone = true;
+      document.removeEventListener("keydown", handleKeyDown);
+      overlay.classList.remove("is-open");
+      overlay.classList.add("is-closing");
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        resolve();
+      }, 150);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" || e.key === "Enter") {
+        e.preventDefault();
+        finish();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) finish();
+    });
+
+    const okBtn = overlay.querySelector("#btnGlassAlertOk");
+    if (okBtn) {
+      okBtn.addEventListener("click", finish);
+      okBtn.focus();
+    }
+  });
+}
+
+// Global safety net: intercept any direct window.alert / window.confirm
+if (typeof window !== "undefined") {
+  window.alert = function(msg) {
+    showGlassAlert({
+      title: "Notice",
+      message: String(msg),
+      icon: "info"
+    });
+  };
 }
 
 function showToastNotification(message, duration = 3500) {
@@ -2347,6 +2668,19 @@ function handlePracticeAnswer(q, chosenOpt, qCard, optsStack, idx) {
     }, 0);
   }
 
+  // Smooth tactile haptic feedback on supported browsers/devices
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try {
+      if (isCorrect) {
+        // Delicate double-tick: 24ms pulse, 36ms pause, 28ms pulse
+        navigator.vibrate([24, 36, 28]);
+      } else {
+        // Refined soft warning vibration: 45ms
+        navigator.vibrate(45);
+      }
+    } catch (e) {}
+  }
+
   // 2. Choreographed Solution Reveal & Persistence (Guarantees silky 120 FPS button animation)
   setTimeout(() => {
     requestAnimationFrame(() => {
@@ -2446,10 +2780,16 @@ function handlePracticeClear(q, qCard, optsStack) {
 
   saveCurrentState();
   updateLivePracticeProgress();
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try { navigator.vibrate(15); } catch (e) {}
+  }
 }
 
 // In-Place Practice Mode Flag Toggle Handler
 function handlePracticeFlagToggle(q, qCard) {
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    try { navigator.vibrate(12); } catch (e) {}
+  }
   const isCurrentlyFlagged = userReviewFlags.has(q.id);
   if (isCurrentlyFlagged) {
     userReviewFlags.delete(q.id);
@@ -2734,6 +3074,12 @@ function renderMainQuestionView() {
           optBtn.classList.add("dimmed");
         }
       }
+
+      optBtn.addEventListener("pointerdown", () => {
+        if (!optBtn.disabled && typeof navigator !== "undefined" && navigator.vibrate) {
+          try { navigator.vibrate(10); } catch (e) {}
+        }
+      });
 
       optBtn.addEventListener("click", () => {
         handlePracticeAnswer(q, opt, qCard, optsStack, idx);
@@ -3349,8 +3695,16 @@ function setupEventListeners() {
 
   const resetExamBtn = document.getElementById("btnResetExamMode");
   if (resetExamBtn) {
-    resetExamBtn.addEventListener("click", () => {
-      if (confirm("Reset all answers in Exam Mode?")) {
+    resetExamBtn.addEventListener("click", async () => {
+      const confirmed = await showGlassConfirm({
+        title: "Reset Exam Answers",
+        message: "Reset all answers in Exam Mode?",
+        confirmText: "Reset",
+        cancelText: "Cancel",
+        isDestructive: true,
+        icon: "reset"
+      });
+      if (confirmed) {
         userExamAnswers = {};
         saveCurrentState();
         renderFullExamQuestions();

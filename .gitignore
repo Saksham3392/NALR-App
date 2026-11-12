@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+mobile/node_modules/
+
+# Expo & Dist
+.expo/
+mobile/.expo/
+dist/
+mobile/dist/
+web-build/
+
+# Android build outputs & caches
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/.cxx/
+mobile/android/.cxx/
+mobile/android/local.properties
+mobile/android/.kotlin/
+mobile/android/app/src/main/java/inline/
+
+# Logs & temporary files
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment variables
+.env
+.env*.local
+!.env.example
+
+# macOS / Windows system files
+.DS_Store
+Thumbs.db
